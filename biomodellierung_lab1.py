@@ -1,16 +1,15 @@
-
 #!/usr/bin/env python3
-"""Vollstaendige Python-Loesung zu Lab 1: Membranpotential und Ionenkanäle.
+"""Complete Python solution for Lab 1: membrane potential and ion channels.
 
-Das Skript implementiert
-  1. die GHK-Spannungs- und GHK-Stromgleichung,
-  2. ein kugelfoermiges Ein-Kompartiment-Modell,
-  3. stochastische spannungsabhaengige m- und h-Gates,
-  4. einen stochastischen m^3 h-Natriumkanal und Na-Spikes.
+The script implements
+  1. the GHK voltage and GHK current equations,
+  2. a spherical single-compartment model,
+  3. stochastic voltage-dependent m and h gates,
+  4. a stochastic m^3 h sodium channel and Na spikes.
 
-Alle internen Rechnungen benutzen SI-Einheiten. Spannungen werden in Volt,
-Zeiten in Sekunden und Stroeme in Ampere gespeichert. Die Tabellenwerte der
-Konzentrationen koennen direkt verwendet werden, weil 1 mM = 1 mol/m^3 gilt.
+All internal calculations use SI units. Voltages are stored in volts,
+times in seconds, and currents in amperes. The concentration values in the
+table can be used directly because 1 mM = 1 mol/m^3.
 """
 
 from __future__ import annotations
@@ -27,11 +26,11 @@ import numpy as np
 
 
 # -----------------------------------------------------------------------------
-# Konstanten und Labordaten
+# Constants and laboratory data
 # -----------------------------------------------------------------------------
 
-R = 8.314  # J / (K mol), Wert aus dem Aufgabenblatt
-F = 96480.0  # C / mol, Wert aus dem Aufgabenblatt
+R = 8.314  # J / (K mol), value from the assignment
+F = 96480.0  # C / mol, value from the assignment
 TEMPERATURE = 293.0  # K
 
 ION_NAMES = np.array(["K", "Na", "Cl"])
@@ -52,11 +51,11 @@ DEFAULT_STIMULUS_PA = 0.200
 
 
 # -----------------------------------------------------------------------------
-# GHK-Gleichungen
+# GHK equations
 # -----------------------------------------------------------------------------
 
 def _x_over_one_minus_exp_minus_x(x: np.ndarray | float) -> np.ndarray:
-    """Stabile Auswertung von x / (1 - exp(-x)), auch fuer x nahe null."""
+    """Stable evaluation of x / (1 - exp(-x)), including x near zero."""
 
     x_arr = np.asarray(x, dtype=float)
     small = np.abs(x_arr) < 1e-7
@@ -76,10 +75,10 @@ def ghk_voltage(
     c_in: np.ndarray = C_IN,
     c_out: np.ndarray = C_OUT,
 ) -> float:
-    """GHK-Ruhepotential fuer K, Na und Cl in Volt.
+    """GHK resting potential for K, Na, and Cl in volts.
 
-    Fuer das Anion Cl stehen Innen- und Aussenkonzentration in der
-    GHK-Spannungsgleichung vertauscht.
+    For the anion Cl, the intracellular and extracellular concentrations
+    are interchanged in the GHK voltage equation.
     """
 
     p = np.asarray(permeability, dtype=float)
@@ -94,7 +93,7 @@ def nernst_potentials(
     c_in: np.ndarray = C_IN,
     c_out: np.ndarray = C_OUT,
 ) -> np.ndarray:
-    """Nernst-Potentiale fuer jede Ionenspezies in Volt."""
+    """Nernst potentials for each ion species in volts."""
 
     return R * TEMPERATURE / (Z * F) * np.log(c_out / c_in)
 
@@ -105,10 +104,10 @@ def ghk_current_density_outward(
     c_in: np.ndarray = C_IN,
     c_out: np.ndarray = C_OUT,
 ) -> np.ndarray:
-    """GHK-Stromdichte jeder Ionenspezies, nach aussen positiv, in A/m^2.
+    """GHK current density for each ion species, positive outward, in A/m^2.
 
-    Die letzte Achse des Ergebnisses entspricht [K, Na, Cl]. Fuer V=0 wird
-    automatisch der korrekte Grenzwert P*z*F*(C_in-C_out) verwendet.
+    The last axis of the result corresponds to [K, Na, Cl]. At V=0, the
+    correct limiting value P*z*F*(C_in-C_out) is used automatically.
     """
 
     v = np.asarray(voltage, dtype=float)
@@ -127,7 +126,7 @@ def ghk_total_current_density_outward(
     voltage: np.ndarray | float,
     permeability: np.ndarray = P_BASE,
 ) -> np.ndarray:
-    """Summe der GHK-Stromdichten, nach aussen positiv, in A/m^2."""
+    """Sum of the GHK current densities, positive outward, in A/m^2."""
 
     return np.sum(
         ghk_current_density_outward(voltage, permeability), axis=-1
@@ -135,19 +134,19 @@ def ghk_total_current_density_outward(
 
 
 def sphere_area(diameter: float) -> float:
-    """Oberflaeche einer Kugel aus ihrem Durchmesser: 4*pi*r^2 = pi*d^2."""
+    """Surface area of a sphere from its diameter: 4*pi*r^2 = pi*d^2."""
 
     return float(np.pi * diameter**2)
 
 
 def capacitance(diameter: float) -> float:
-    """Gesamtkapazitaet eines kugelfoermigen Kompartiments in Farad."""
+    """Total capacitance of a spherical compartment in farads."""
 
     return SPECIFIC_CAPACITANCE * sphere_area(diameter)
 
 
 def slope_conductance_density(voltage: float, dv: float = 1e-7) -> float:
-    """Differentielle Membranleitfaehigkeit dJ_out/dV in S/m^2."""
+    """Differential membrane conductance dJ_out/dV in S/m^2."""
 
     upper = ghk_total_current_density_outward(voltage + dv)
     lower = ghk_total_current_density_outward(voltage - dv)
@@ -155,11 +154,11 @@ def slope_conductance_density(voltage: float, dv: float = 1e-7) -> float:
 
 
 # -----------------------------------------------------------------------------
-# Passives kugelfoermiges Kompartiment
+# Passive spherical compartment
 # -----------------------------------------------------------------------------
 
 def protocol_permeabilities(time: float) -> np.ndarray:
-    """Zeitprotokoll aus Abschnitt 4 des Aufgabenblatts."""
+    """Time protocol from Section 4 of the assignment."""
 
     p = P_BASE.copy()
     if 10e-3 <= time < 15e-3:
@@ -177,7 +176,7 @@ def simulate_passive_compartment(
     dt: float = DT,
     t_end: float = T_END,
 ) -> dict[str, np.ndarray | float]:
-    """Euler-vorwaerts-Simulation eines passiven Membrankompartiments."""
+    """Forward Euler simulation of a passive membrane compartment."""
 
     time = np.arange(0.0, t_end + 0.5 * dt, dt)
     voltage = np.empty(time.size)
@@ -193,7 +192,7 @@ def simulate_passive_compartment(
             if changing_permeabilities
             else P_BASE
         )
-        # GHK ist nach aussen positiv; die ODE verlangt nach innen positiv.
+        # GHK is positive outward; the ODE requires positive inward current.
         current_inward[k] = -area * ghk_total_current_density_outward(
             voltage[k], p
         )
@@ -221,7 +220,7 @@ def simulate_passive_compartment(
 def estimate_passive_time_constant(
     time: np.ndarray, voltage: np.ndarray, target_voltage: float
 ) -> tuple[float, float]:
-    """Liefert 1/e-Ablesewert und Exponentialfit fuer tau in Sekunden."""
+    """Return the 1/e estimate and exponential-fit estimate of tau in seconds."""
 
     ratio = (voltage - target_voltage) / (voltage[0] - target_voltage)
     idx = int(np.argmin(np.abs(ratio - np.exp(-1.0))))
@@ -234,22 +233,22 @@ def estimate_passive_time_constant(
 
 
 # -----------------------------------------------------------------------------
-# Spannungsabhaengige stochastische Gates
+# Voltage-dependent stochastic gates
 # -----------------------------------------------------------------------------
 
 def m_rates(voltage: np.ndarray | float) -> tuple[np.ndarray, np.ndarray]:
-    """Oeffnungs- und Schliessrate des Na-m-Gates in 1/s."""
+    """Opening and closing rates of the Na-m gate in 1/s."""
 
     v = np.asarray(voltage, dtype=float)
     x = (v + 0.035) / 0.010
-    # Umformung vermeidet die hebbare Singularitaet bei V=-35 mV.
+    # This reformulation avoids the removable singularity at V=-35 mV.
     alpha = 1000.0 * _x_over_one_minus_exp_minus_x(x)
     beta = 4000.0 * np.exp(-(v + 0.060) / 0.018)
     return alpha, beta
 
 
 def h_rates(voltage: np.ndarray | float) -> tuple[np.ndarray, np.ndarray]:
-    """Oeffnungs- und Schliessrate des Na-h-Gates in 1/s."""
+    """Opening and closing rates of the Na-h gate in 1/s."""
 
     v = np.asarray(voltage, dtype=float)
     alpha = 12.0 * np.exp(-v / 0.020)
@@ -260,7 +259,7 @@ def h_rates(voltage: np.ndarray | float) -> tuple[np.ndarray, np.ndarray]:
 def steady_state_and_tau(
     alpha: np.ndarray | float, beta: np.ndarray | float
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Stationaere Offenwahrscheinlichkeit und Relaxationszeit."""
+    """Steady-state open probability and relaxation time."""
 
     rate_sum = np.asarray(alpha) + np.asarray(beta)
     return np.asarray(alpha) / rate_sum, 1.0 / rate_sum
@@ -273,11 +272,11 @@ def transition_probabilities(
     *,
     method: str = "exact",
 ) -> tuple[np.ndarray, np.ndarray]:
-    """P(C->O) und P(O->C) innerhalb eines Zeitschritts.
+    """P(C->O) and P(O->C) over one time step.
 
-    exact integriert den Zwei-Zustands-Markovprozess exakt, falls die Raten
-    innerhalb des Schritts konstant sind. euler reproduziert alpha*dt und
-    beta*dt aus dem Blatt, lehnt aber ungueltige Wahrscheinlichkeiten ab.
+    exact integrates the two-state Markov process exactly if the rates
+    remain constant within the step. euler reproduces alpha*dt and
+    beta*dt from the assignment, but rejects invalid probabilities.
     """
 
     a = np.asarray(alpha, dtype=float)
@@ -306,7 +305,7 @@ def update_gate(
     dt: float,
     random_numbers: np.ndarray | float,
 ) -> np.ndarray:
-    """Ein exakter Zeitschritt fuer unabhaengige Zwei-Zustands-Gates."""
+    """One exact time step for independent two-state gates."""
 
     p_open, p_close = transition_probabilities(alpha, beta, dt, method="exact")
     current = np.asarray(state, dtype=bool)
@@ -321,7 +320,7 @@ def simulate_m_gate_traces(
     dt: float = DT,
     t_end: float = T_END,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Ein einzelnes m-Gate bei jeder konstant gehaltenen Spannung."""
+    """A single m gate at each constant holding voltage."""
 
     time = np.arange(0.0, t_end + 0.5 * dt, dt)
     traces = np.zeros((len(voltages), len(time)), dtype=np.int8)
@@ -345,7 +344,7 @@ def simulate_m3h_channel_traces(
     dt: float = DT,
     t_end: float = T_END,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Ein m^3h-Natriumkanal bei jeder konstant gehaltenen Spannung."""
+    """One m^3h sodium channel at each constant holding voltage."""
 
     time = np.arange(0.0, t_end + 0.5 * dt, dt)
     traces = np.zeros((len(voltages), len(time)), dtype=np.int8)
@@ -368,7 +367,7 @@ def simulate_m3h_channel_traces(
 
 
 # -----------------------------------------------------------------------------
-# Spine-Kompartiment mit stochastischen Na-Kanaelen
+# Spine compartment with stochastic Na channels
 # -----------------------------------------------------------------------------
 
 def make_channel_noise(
@@ -376,7 +375,7 @@ def make_channel_noise(
     n_steps: int,
     max_channels: int,
 ) -> np.ndarray:
-    """Vorgezogene Zufallszahlen fuer reproduzierbare Kanalvergleiche."""
+    """Pre-generated random numbers for reproducible channel comparisons."""
 
     rng = np.random.default_rng(seed)
     return rng.random((n_steps - 1, 4, max_channels))
@@ -392,11 +391,11 @@ def simulate_spine_with_na_channels(
     dt: float = DT,
     t_end: float = T_END,
 ) -> dict[str, np.ndarray]:
-    """Stochastisches Spine-Modell aus Abschnitt 6.
+    """Stochastic spine model from Section 6.
 
-    Der Reiz ist zwischen 10 und 15 ms aktiv. Optional wird P_K zwischen
-    20 und 25 ms verzehnfacht. Wie im Beispielcode starten alle Gates im
-    geschlossenen Zustand.
+    The stimulus is active between 10 and 15 ms. Optionally, P_K is
+    increased tenfold between 20 and 25 ms. As in the example code,
+    all gates start in the closed state.
     """
 
     if n_channels < 0:
@@ -484,7 +483,7 @@ def simulate_spike_ensemble(
     dt: float = DT,
     t_end: float = T_END,
 ) -> np.ndarray:
-    """Vektorisierte Monte-Carlo-Simulation; Rueckgabe der Peakspannungen."""
+    """Vectorized Monte Carlo simulation; return the peak voltages."""
 
     rng = np.random.default_rng(seed)
     time = np.arange(0.0, t_end + 0.5 * dt, dt)
@@ -546,7 +545,7 @@ def probability_threshold(
     probabilities: np.ndarray,
     target_probability: float,
 ) -> float:
-    """Lineare Interpolation des ersten Zielwahrscheinlichkeits-Uebergangs."""
+    """Linearly interpolate the first crossing of the target probability."""
 
     indices = np.flatnonzero(probabilities >= target_probability)
     if not len(indices):
@@ -562,7 +561,7 @@ def probability_threshold(
 
 
 # -----------------------------------------------------------------------------
-# Abbildungen und tabellarische Ausgaben
+# Figures and tabular output
 # -----------------------------------------------------------------------------
 
 def save_figure(fig: plt.Figure, output_dir: Path, filename: str) -> None:
@@ -588,8 +587,8 @@ def plot_binary_trace_grid(
         ax.set_yticks([0, 1])
     for ax in axes_flat[len(voltages) :]:
         ax.axis("off")
-    fig.supxlabel("Zeit (ms)")
-    fig.supylabel("Zustand (0 = geschlossen, 1 = offen)")
+    fig.supxlabel("Time (ms)")
+    fig.supylabel("State (0 = closed, 1 = open)")
     fig.suptitle(title)
     fig.tight_layout()
     save_figure(fig, output_dir, filename)
@@ -606,7 +605,7 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
         }
     )
 
-    # Abschnitt 3: GHK-Spannung
+    # Section 3: GHK voltage
     v_rest = ghk_voltage()
     v_swapped = ghk_voltage(P_BASE, C_OUT, C_IN)
     only_k = np.array([P_BASE[0], 0.0, 0.0])
@@ -624,11 +623,11 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
     fig, ax = plt.subplots(figsize=(7.5, 4.8))
     for i, name in enumerate(ION_NAMES):
         ax.plot(voltages_iv * 1e3, currents_iv[:, i], label=str(name))
-    ax.plot(voltages_iv * 1e3, total_iv, "k", lw=2.2, label="Summe")
+    ax.plot(voltages_iv * 1e3, total_iv, "k", lw=2.2, label="Total")
     ax.axhline(0.0, color="0.5", lw=0.8)
     ax.axvline(v_rest * 1e3, color="0.4", ls="--", lw=1.0)
-    ax.set(xlabel="Membranpotential (mV)", ylabel="GHK-Stromdichte nach außen (A/m²)")
-    ax.set_title("GHK-Strom-Spannungs-Beziehung")
+    ax.set(xlabel="Membrane potential (mV)", ylabel="Outward GHK current density (A/m²)")
+    ax.set_title("GHK current-voltage relationship")
     ax.legend(ncol=2)
     fig.tight_layout()
     save_figure(fig, output_dir, "01_ghk_iv.png")
@@ -640,7 +639,7 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
         comments="",
     )
 
-    # Abschnitt 4: passives Kompartiment und Leitfaehigkeit
+    # Section 4: passive compartment and conductance
     soma_area = sphere_area(SOMA_DIAMETER)
     spine_area = sphere_area(SPINE_DIAMETER)
     j_minus50 = float(ghk_total_current_density_outward(-50e-3))
@@ -667,11 +666,11 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
     voltage = np.asarray(passive_soma["voltage"])
     exponential_fit = v_rest + (voltage[0] - v_rest) * np.exp(-time / tau_fit)
     fig, ax = plt.subplots(figsize=(7.5, 4.6))
-    ax.plot(time * 1e3, voltage * 1e3, label="Euler-Simulation")
-    ax.plot(time * 1e3, exponential_fit * 1e3, "--", label=f"Exponentialfit: τ = {tau_fit * 1e3:.2f} ms")
-    ax.axhline(v_rest * 1e3, color="0.4", ls=":", label="GHK-Ruhepotential")
-    ax.set(xlabel="Zeit (ms)", ylabel="Membranpotential (mV)")
-    ax.set_title("Passives Soma ab -50 mV")
+    ax.plot(time * 1e3, voltage * 1e3, label="Euler simulation")
+    ax.plot(time * 1e3, exponential_fit * 1e3, "--", label=f"Exponential fit: τ = {tau_fit * 1e3:.2f} ms")
+    ax.axhline(v_rest * 1e3, color="0.4", ls=":", label="GHK resting potential")
+    ax.set(xlabel="Time (ms)", ylabel="Membrane potential (mV)")
+    ax.set_title("Passive soma starting at -50 mV")
     ax.legend()
     fig.tight_layout()
     save_figure(fig, output_dir, "02_passive_soma.png")
@@ -689,15 +688,15 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
     fig, axes = plt.subplots(3, 1, figsize=(8, 8), sharex=True)
     axes[0].plot(protocol_time * 1e3, np.asarray(protocol_soma["voltage"]) * 1e3, label="Soma (100 µm)")
     axes[0].plot(protocol_time * 1e3, np.asarray(protocol_spine["voltage"]) * 1e3, "--", label="Spine (1 µm)")
-    axes[0].plot(protocol_time * 1e3, target * 1e3, ":", color="0.35", label="momentanes GHK-Ziel")
+    axes[0].plot(protocol_time * 1e3, target * 1e3, ":", color="0.35", label="instantaneous GHK target")
     axes[0].set_ylabel("V (mV)")
     axes[0].legend(ncol=2)
-    axes[0].set_title("Zeitabhaengige Na- und K-Permeabilitaet")
+    axes[0].set_title("Time-dependent Na and K permeability")
     axes[1].plot(protocol_time * 1e3, np.asarray(protocol_soma["current_inward"]) * 1e12)
-    axes[1].set_ylabel("I Soma (pA)\nnach innen")
+    axes[1].set_ylabel("Soma current (pA)\ninward")
     axes[2].plot(protocol_time * 1e3, np.asarray(protocol_spine["current_inward"]) * 1e12)
-    axes[2].set_ylabel("I Spine (pA)\nnach innen")
-    axes[2].set_xlabel("Zeit (ms)")
+    axes[2].set_ylabel("Spine current (pA)\ninward")
+    axes[2].set_xlabel("Time (ms)")
     for ax in axes:
         for boundary in (10, 15, 25, 30):
             ax.axvline(boundary, color="0.8", lw=0.7)
@@ -708,7 +707,7 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
     peak_protocol_idx = int(np.argmax(protocol_v))
     min_protocol_idx = int(np.argmin(protocol_v))
 
-    # Abschnitt 5: Gate-Kinetik und Einzelspuren
+    # Section 5: gate kinetics and individual traces
     voltage_steps = np.arange(-80.0, 80.0 + 5.0, 10.0) * 1e-3
     voltage_dense = np.linspace(-80e-3, 80e-3, 801)
     alpha_m_dense, beta_m_dense = m_rates(voltage_dense)
@@ -722,11 +721,11 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.2))
     axes[0].plot(voltage_dense * 1e3, m_inf_dense)
     axes[0].plot(voltage_steps * 1e3, m_inf_steps, "o", ms=4)
-    axes[0].set(xlabel="V (mV)", ylabel="m∞", title="Stationaere Aktivierung")
+    axes[0].set(xlabel="V (mV)", ylabel="m∞", title="Steady-state activation")
     axes[0].set_ylim(-0.02, 1.02)
     axes[1].plot(voltage_dense * 1e3, tau_m_dense * 1e3)
     axes[1].plot(voltage_steps * 1e3, tau_m_steps * 1e3, "o", ms=4)
-    axes[1].set(xlabel="V (mV)", ylabel="τm (ms)", title="Zeitkonstante des m-Gates")
+    axes[1].set(xlabel="V (mV)", ylabel="τm (ms)", title="Time constant of the m gate")
     fig.tight_layout()
     save_figure(fig, output_dir, "04_m_gate_kinetics.png")
     np.savetxt(
@@ -752,7 +751,7 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
         gate_time,
         m_traces,
         voltage_steps,
-        "Stochastischer Zustand eines einzelnen Na-m-Gates",
+        "Stochastic state of a single Na-m gate",
         output_dir,
         "05_m_gate_traces.png",
     )
@@ -761,12 +760,12 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
         channel_time,
         channel_traces,
         voltage_steps,
-        "Stochastischer Zustand eines m³h-Natriumkanals",
+        "Stochastic state of an m³h sodium channel",
         output_dir,
         "06_m3h_channel_traces.png",
     )
 
-    # Abschnitt 6: Na-Spike, Kanalzahl und K-Puls
+    # Section 6: Na spike, channel count, and K pulse
     n_steps = int(round(T_END / DT)) + 1
     shared_noise = make_channel_noise(DEFAULT_SEED, n_steps, 40)
     active_trace = simulate_spine_with_na_channels(
@@ -777,16 +776,16 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
     )
     spike_time = np.asarray(active_trace["time"])
     fig, axes = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
-    axes[0].plot(spike_time * 1e3, np.asarray(active_trace["voltage"]) * 1e3, label="40 Na-Kanaele")
-    axes[0].plot(spike_time * 1e3, np.asarray(passive_trace["voltage"]) * 1e3, "--", label="0 Na-Kanaele")
+    axes[0].plot(spike_time * 1e3, np.asarray(active_trace["voltage"]) * 1e3, label="40 Na channels")
+    axes[0].plot(spike_time * 1e3, np.asarray(passive_trace["voltage"]) * 1e3, "--", label="0 Na channels")
     axes[0].axhline(0.0, color="0.5", lw=0.7)
     axes[0].set_ylabel("V (mV)")
     axes[0].legend()
-    axes[0].set_title(f"Spine mit {DEFAULT_STIMULUS_PA:.3f} pA Reizstrom")
+    axes[0].set_title(f"Spine with a {DEFAULT_STIMULUS_PA:.3f} pA stimulus current")
     axes[1].step(spike_time * 1e3, active_trace["open_channels"], where="post")
-    axes[1].set(xlabel="Zeit (ms)", ylabel="offene Kanaele")
+    axes[1].set(xlabel="Time (ms)", ylabel="open channels")
     for ax in axes:
-        ax.axvspan(10, 15, color="tab:orange", alpha=0.15, label="Reiz")
+        ax.axvspan(10, 15, color="tab:orange", alpha=0.15, label="Stimulus")
     fig.tight_layout()
     save_figure(fig, output_dir, "07_spike_active_vs_passive.png")
 
@@ -809,10 +808,10 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
             label=f"N = {n_channels}",
         )
     axes[0].axvspan(10, 15, color="tab:orange", alpha=0.15)
-    axes[0].set(xlabel="Zeit (ms)", ylabel="V (mV)", title="Einzelspuren")
+    axes[0].set(xlabel="Time (ms)", ylabel="V (mV)", title="Individual traces")
     axes[0].legend(ncol=2)
     axes[1].plot(channel_numbers, peaks_by_channel, "o-")
-    axes[1].set(xlabel="Anzahl Na-Kanaele", ylabel="Peakpotential (mV)", title="Nichtlineare Schwelle")
+    axes[1].set(xlabel="Number of Na channels", ylabel="Peak potential (mV)", title="Nonlinear threshold")
     fig.tight_layout()
     save_figure(fig, output_dir, "08_channel_number_effect.png")
 
@@ -824,11 +823,11 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
         k_pulse=True,
     )
     fig, ax = plt.subplots(figsize=(8, 4.7))
-    ax.plot(spike_time * 1e3, no_k_pulse["voltage"] * 1e3, label="normales P_K")
-    ax.plot(spike_time * 1e3, with_k_pulse["voltage"] * 1e3, label="10 × P_K bei 20-25 ms")
-    ax.axvspan(10, 15, color="tab:orange", alpha=0.12, label="Reiz")
-    ax.axvspan(20, 25, color="tab:blue", alpha=0.10, label="K-Puls")
-    ax.set(xlabel="Zeit (ms)", ylabel="V (mV)", title="Wirkung erhoehter K-Permeabilitaet")
+    ax.plot(spike_time * 1e3, no_k_pulse["voltage"] * 1e3, label="normal P_K")
+    ax.plot(spike_time * 1e3, with_k_pulse["voltage"] * 1e3, label="10 × P_K at 20-25 ms")
+    ax.axvspan(10, 15, color="tab:orange", alpha=0.12, label="Stimulus")
+    ax.axvspan(20, 25, color="tab:blue", alpha=0.10, label="K pulse")
+    ax.set(xlabel="Time (ms)", ylabel="V (mV)", title="Effect of increased K permeability")
     ax.legend(ncol=2)
     fig.tight_layout()
     save_figure(fig, output_dir, "09_k_permeability_pulse.png")
@@ -840,7 +839,7 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
         ensemble_peaks = simulate_spike_ensemble(
             float(current), n_trials=n_trials
         )
-        # Explizite Annahme: Ein Spike liegt vor, wenn V_peak >= 0 mV.
+        # Explicit assumption: a spike occurs if V_peak >= 0 mV.
         spike_probabilities[i] = np.mean(ensemble_peaks >= 0.0)
         median_peaks[i] = np.median(ensemble_peaks) * 1e3
 
@@ -853,9 +852,9 @@ def run_all(output_dir: Path, n_trials: int) -> dict[str, object]:
     if np.isfinite(i50):
         ax.axvline(i50, color="tab:red", ls="--", label=f"I50 ≈ {i50:.3f} pA")
     ax.set(
-        xlabel="Reizstrom (pA; 10-15 ms)",
+        xlabel="Stimulus current (pA; 10-15 ms)",
         ylabel="P(Vpeak ≥ 0 mV)",
-        title=f"Stochastische Spike-Wahrscheinlichkeit ({n_trials} Laeufe)",
+        title=f"Stochastic spike probability ({n_trials} trials)",
         ylim=(-0.03, 1.03),
     )
     ax.legend()
@@ -956,34 +955,34 @@ def print_summary(summary: dict[str, object]) -> None:
     s3 = summary["section_3"]
     s4 = summary["section_4"]
     s6 = summary["section_6"]
-    print("\nWICHTIGE ERGEBNISSE")
+    print("\nKEY RESULTS")
     print(f"V_rest = {s3['resting_potential_mV']:.3f} mV")
-    print(f"Vertauschte Konzentrationen: {s3['swapped_concentrations_mV']:.3f} mV")
-    print(f"Nur K: {s3['K_only_mV']:.3f} mV; nur Na: {s3['Na_only_mV']:.3f} mV")
-    print(f"J_total(-70 mV), nach aussen = {s3['J_outward_at_minus70_total_A_per_m2']:.6g} A/m^2")
-    print(f"J_total(0 mV), nach aussen = {s3['J_outward_at_zero_total_A_per_m2']:.6g} A/m^2")
-    print(f"I_soma(-50 mV), nach innen = {s4['I_soma_inward_at_minus50_A'] * 1e12:.3f} pA")
-    print(f"Differentielle G_soma(-50 mV) = {s4['slope_conductance_soma_at_minus50_S'] * 1e9:.3f} nS")
+    print(f"Swapped concentrations: {s3['swapped_concentrations_mV']:.3f} mV")
+    print(f"K only: {s3['K_only_mV']:.3f} mV; Na only: {s3['Na_only_mV']:.3f} mV")
+    print(f"J_total(-70 mV), outward = {s3['J_outward_at_minus70_total_A_per_m2']:.6g} A/m^2")
+    print(f"J_total(0 mV), outward = {s3['J_outward_at_zero_total_A_per_m2']:.6g} A/m^2")
+    print(f"I_soma(-50 mV), inward = {s4['I_soma_inward_at_minus50_A'] * 1e12:.3f} pA")
+    print(f"Differential G_soma(-50 mV) = {s4['slope_conductance_soma_at_minus50_S'] * 1e9:.3f} nS")
     print(f"Tau (1/e) = {s4['tau_one_over_e_ms']:.3f} ms; Fit = {s4['tau_exponential_fit_ms']:.3f} ms")
-    print(f"40-Kanal-Demospike bei {s6['demonstration_stimulus_pA']:.3f} pA: {s6['fixed_seed_active_40_peak_mV']:.3f} mV")
-    print(f"Monte-Carlo I50 = {s6['I50_pA']:.3f} pA ({s6['monte_carlo_trials_per_current']} Laeufe pro Strom)")
+    print(f"40-channel demo spike at {s6['demonstration_stimulus_pA']:.3f} pA: {s6['fixed_seed_active_40_peak_mV']:.3f} mV")
+    print(f"Monte-Carlo I50 = {s6['I50_pA']:.3f} pA ({s6['monte_carlo_trials_per_current']} trials per current)")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Loest und visualisiert alle Aufgaben aus Biomodellierung Lab 1."
+        description="Solve and visualize all tasks from Biomodeling Lab 1."
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("lab1_results"),
-        help="Verzeichnis fuer PNG-, CSV- und JSON-Ergebnisse.",
+        help="Directory for PNG, CSV, and JSON results.",
     )
     parser.add_argument(
         "--trials",
         type=int,
         default=400,
-        help="Monte-Carlo-Laeufe je Reizstrom fuer die Spike-Wahrscheinlichkeit.",
+        help="Monte Carlo trials per stimulus current for the spike probability.",
     )
     return parser.parse_args()
 
@@ -994,7 +993,7 @@ def main() -> None:
         raise ValueError("--trials must be positive.")
     summary = run_all(args.output_dir, args.trials)
     print_summary(summary)
-    print(f"\nAbbildungen und Tabellen: {args.output_dir.resolve()}")
+    print(f"\nFigures and tables: {args.output_dir.resolve()}")
 
 
 if __name__ == "__main__":
